@@ -57,10 +57,11 @@ def get_pred_polygon(pred_masks, image_idx:int, idx:int):
     pred_mask = Polygon(edge).buffer(1)
     return image_name, pred_mask, edge
 
-def compute_iou(gt_annotations, pred_masks, threshold:int=100*200):
+def compute_iou(gt_annotations, pred_masks):
     # compute IoUs
     # reference: https://learnopencv.com/intersection-over-union-iou-in-object-detection-and-segmentation/
     ious = []
+    tps_temp, fps_temp, fns_temp = [], [], []
     tps, fps, fns = [], [], []
     # for each image
     for i in tqdm(range(len(pred_masks)), desc="Computing IoU..."):
@@ -74,18 +75,23 @@ def compute_iou(gt_annotations, pred_masks, threshold:int=100*200):
                     gt_mask, (gt_x,gt_y) = get_gt_polygon(gt_annotations, k)
                     intersection = gt_mask.intersection(pred_mask)
                     tp = intersection.area
-                    # if the intersection area is larger than the threshold
-                    if tp >= threshold: 
-                        fp = pred_mask.area - tp
-                        fn = gt_mask.area - tp
-                        iou = tp / (tp + fp + fn) # iou = intersection.area / union.area
-                        ious.append(iou)
-                        tps.append(tp); fps.append(fp); fns.append(fn)
-    ious = np.array(ious)
+                    fp = pred_mask.area - tp
+                    fn = gt_mask.area - tp
+                    iou = tp / (tp + fp + fn) # iou = intersection.area / union.area
+                    ious.append(iou)
+                    tps_temp.append(tp); fps_temp.append(fp); fns_temp.append(fn)
+            # locate the index of the highest IoU
+            idx = np.argmax(ious)
+            tps.append(tps_temp[idx]) # TP of the maks of the highest IoU
+            fps.append(fps_temp[idx]) # FP of the maks of the highest IoU
+            fns.append(fns_temp[idx]) # FN of the maks of the highest IoU
+            # reset temporary lists
+            ious = []
+            tps_temp, fps_temp, fns_temp = [], [], []
     tps, fps, fns = np.array(tps), np.array(fps), np.array(fns)
-    return ious, tps, fps, fns
+    return tps, fps, fns
 
-def confusion_matrix_by_area(tps, fps, fns, threshold:int):
+def confusion_matrix_by_area(tps, fps, fns):
     # compute confusion matrix by area
     confusion_matrix = np.zeros((2, 2))
     confusion_matrix[0, 0] = np.sum(tps) # TP
@@ -94,8 +100,8 @@ def confusion_matrix_by_area(tps, fps, fns, threshold:int):
     confusion_matrix[1, 1] = 0
     confusion_matrix = confusion_matrix.astype(int)
     disp = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=["Positive", "Negative"])
-    disp.plot()
-    plt.title(f"Confusion Matrix by Pixel Area\nThreshold={threshold} pixels")
+    disp.plot(values_format="d", cmap="viridis")
+    plt.title(f"Confusion Matrix by Pixel Area (Number of Pixels)")
     plt.show()
     return confusion_matrix
 

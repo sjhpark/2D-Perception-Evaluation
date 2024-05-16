@@ -1,6 +1,5 @@
 import os
 import json
-import argparse
 import pandas as pd
 import numpy as np
 import torch
@@ -9,9 +8,6 @@ from utils import color_print, read_json, compute_iou, \
                     confusion_matrix_by_area, evaluation_metrics_by_area
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--threshold", type=int, default=100*200, help="Threshold for small object", required=False)
-    args = parser.parse_args()
 
     # GT annotations
     fname = "ground-truth-coco/annotations.json"
@@ -56,10 +52,10 @@ if __name__ == '__main__':
         masks.append(mask)
 
     # compute IoUs, TPs, FPs, FNs
-    ious, tps, fps, fns = compute_iou(annotations, masks, args.threshold)
+    tps, fps, fns = compute_iou(annotations, masks)
 
     # compute confusion matrix
-    confusion_matrix = confusion_matrix_by_area(tps, fps, fns, args.threshold)
+    confusion_matrix = confusion_matrix_by_area(tps, fps, fns)
 
     # compute evaluation metrics
     evaluation_metrics = evaluation_metrics_by_area(confusion_matrix)
