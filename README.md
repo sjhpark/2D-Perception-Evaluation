@@ -4,13 +4,6 @@ Computation of Confusion Matrix and Performance Metrics for Instance Segmentatio
 ---
 
 # Installation & Inference Guide
-## Setup
-```bash
-conda create -n perception python=3.10
-conda activate perception
-pip install -r requirements.txt
-```
-
 ## Dataset Directory
 - ground-truth-coco
   - annotations.json
@@ -19,10 +12,17 @@ pip install -r requirements.txt
     - masks.npy
     - outputs.json
   - ...
-
-## Run Inference (Question Answering)
+ 
+## Setup
 ```bash
-python3 eval.py --threshold 20000 # compute area-based confusion matrix and performance metrics when pixel area threshold is 20000
+conda create -n perception python=3.10
+conda activate perception
+pip install -r requirements.txt
+```
+
+## Run Inference
+```bash
+python3 eval.py # compute area-based confusion matrix and performance metrics
 ```
 
 ## Walk-thru
@@ -35,14 +35,21 @@ Please refer to the Jupyter notebook (perception.ipynb) for more thorough walk-t
 The dataset consists of ground truth (GT) annotations and prediction masks. 
 - There are two classes: Box and Wall.
 - The GT annotations contain exterior vertices of instance segmentation of objects of interest in each of 10 unique images.
+- There are 369 segmentation masks for the ground truth while there are 361 masks for the prediction.
+
+  <img src=https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/num_masks.png width="1000">
+
 - The prediction masks contain exterior and interior pixels of instance segmentation of objects of interest in each of 10 unique images.
 - The prediction outputs contain predicted bounding boxes (upper and lower corner vertices), scores, predicted classes, and image file names.
 
-## Area-based Mapping & Confusion Matrix
-In the dataset, the ground truth annotations and prediction annotations are NOT 1-to-1 mapped.
+## Area-based Mapping & Confusion Matrix for Segmentation Masks
+In the dataset, the ground truth labels and prediction labels are NOT 1-to-1 mapped.
 In other words, we do not know which ground truth label corresponds with which prediction label.
 Thus, it is not feasible to compute a confusion matrix based on classification accuracy.
-Furthermore, this is a binary classification task (box or wall) with there are only 16 walls in the ground truth labels.
+Furthermore, this is a binary classification task (box or wall) with only 16 walls out of 369 instances in the ground truth labels as you can see in the figure below.
+
+<img src=https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/stats.png width="800">
+
 Therefore, as a tweak, I compute a pixel-area based confusion matrix. The steps are as followings:
 1. Compute pixel-based True Positive (TP). This is done by finding the intersected areas.
 2. Compute pixel-baded False Positive (FP). This is done by finding the predicted areas subtracted by intersected areas.
@@ -51,13 +58,69 @@ Therefore, as a tweak, I compute a pixel-area based confusion matrix. The steps 
 5. Set True Negative (TN) to 0 as there is no such a case where prediction and ground truth masks are both none (no mask).
 6. Repeat steps 1 to 5 for each predicted mask agains all the ground truth masks within the same image.
 7. Per image, find an index when the IoU is the highest.
-8. Using the indices, compute pixel-based True Positive (TP). This is done by adding up the intersected areas among all the images.
-9. Using the indices, compute pixel-baded False Positive (FP). This is done by adding up the predicted areas subtracted by intersected areas among all the images.
-10. Using the indices, compute pixel-based False Negative (FN). This is done by adding up the ground truth areas subtracted by intersected areas among all the images.
+   
+    <figure>
+        <img src=https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/gt_pred_polygons.png width="500">
+        <figcaption>Ground Truth Exterior & Predicted Filled Pixels of Masks</figcaption>
+    </figure>
+   
+9. Using the indices, compute pixel-based True Positive (TP). This is done by adding up the intersected areas among all the images.
+10. Using the indices, compute pixel-baded False Positive (FP). This is done by adding up the predicted areas subtracted by intersected areas among all the images.
+11. Using the indices, compute pixel-based False Negative (FN). This is done by adding up the ground truth areas subtracted by intersected areas among all the images.
 
-## Recall, Precision, F1 Socre, & Accuracy
+## Shapely Polygon
+For easy calculation of the intersection between the ground truth and the predicted segmentation masks, I utilize [Shapely](https://shapely.readthedocs.io/en/stable/manual.html), an open-source library.
+Shapely's Polygon function converts exterior pixels of a polygon to a filled polygon, enabling calculation of intersection area between two polygons.
+I convert the ground truth vertices of each segmentation mask to a Shapely polygon.
+For the predicted masks, I extract exterior pixels from given filled pixels, then convert them to Shapely polygons.
+Finally, I can use these Shapely polygons to compute intersected areas.
+
+<div style="display:flex; flex-direction:row;">
+    <figure>
+        <img src="https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/shapely_gt_polygon.svg" width="280">
+        <figcaption>Shapely Ground Truth Polygon</figcaption>
+    </figure>
+    <figure>
+        <img src="https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/shapely_pred_polygon.svg" width="280">
+        <figcaption>Shapely Predicted Polygon</figcaption>
+    </figure>
+</div>
+
+## Performance Metrics (Recall, Precision, F1 Socre, & Accuracy)
+- True Positive (TP): Model correctly identifies object pixels.
+- False Positive (FP): Model wrongly identifies background pixels as object.
+- False Negative (FN): Model misses actual object pixels.
+
 Using TP, FP, and FN, we can calculate recall, precision, f1 score, and accuracy.
 - recall = TP / (TP + FN)
 - precision = TP / (TP + FP)
-- f1 score = 2 * recall * precision / (recall + precision)
+- f1 score = 2 * (recall * precision) / (recall + precision)
 - accuracy = (TP + TN) / (TP + FP + TN + FN)
+
+---
+
+# Discussion
+## Confusion Matrix
+In the previous section, it was mentioned that TP, FN, and FP per image correspond to the highest IoU. 
+The Mask R-CNN model's accumulated TP, FN, and FP across all images are approximately 71e6, 15e6, and 15e6, respectively. 
+TP is roughly five times greater than either FN or FP, indicating that the model segments objects with a decent amount of intersection. 
+Conversely, the 15e6 for FN and FP indicates that there is still room for improvement in the model for greater prediction.
+
+<img src="https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/confusion_matrix.png" width="480">
+
+## Performance Metrics (Recall, Precision, F1 Socre, & Accuracy)
+- Recall: Measures how well the model finds all the object pixels.
+- Precision: Measures how many of the predicted object pixels are actually correct.
+- F1 Score: Combines both recall and precision into a single metric.
+- Accuracy: Measures overall correctness in pixel prediction.
+    
+The model's recall, precision, f1 score, and accuracy are 82.60%, 82.13%, 82.36%, and 70.02% respectively.
+A recall above 80% indicates that the model excels at correctly identifying which pixels belong to the object of interest. 
+Similarly, precision above 80% suggests that the model's predictions are correct many of the time.
+The F1 score provides a balanced view of both recall and precision. With a value above 80%, it indicates that the model performs well in its predictions.
+Since in this case, TN (True Negatives) is assumed to be zero, accuracy is the same as IoU (Intersection over Union). 
+An accuracy of 70% suggests that the model does a decent job of identifying object pixels overall.
+
+<img src="https://github.com/sjhpark/2D-Perception-Evaluation/blob/main/images/performance_metrics.png" width="480">
+
+
