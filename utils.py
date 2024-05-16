@@ -95,8 +95,8 @@ def confusion_matrix_by_area(tps, fps, fns):
     # compute confusion matrix by area
     confusion_matrix = np.zeros((2, 2))
     confusion_matrix[0, 0] = np.sum(tps) # TP
-    confusion_matrix[0, 1] = np.sum(fps) # FP
-    confusion_matrix[1, 0] = np.sum(fns) # FN
+    confusion_matrix[0, 1] = np.sum(fns) # FN
+    confusion_matrix[1, 0] = np.sum(fps) # FP
     confusion_matrix[1, 1] = 0
     confusion_matrix = confusion_matrix.astype(int)
     disp = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=["Positive", "Negative"])
@@ -107,8 +107,8 @@ def confusion_matrix_by_area(tps, fps, fns):
 
 def evaluation_metrics_by_area(confusion_matrix):
     # compute recall, precision, and F-1 score
-    recall = confusion_matrix[0, 0] / (confusion_matrix[0, 0] + confusion_matrix[1, 0]) # TP / (TP + FN)
-    precision = confusion_matrix[0, 0] / (confusion_matrix[0, 0] + confusion_matrix[0, 1]) # TP / (TP + FP)
+    recall = confusion_matrix[0, 0] / (confusion_matrix[0, 0] + confusion_matrix[0, 1]) # TP / (TP + FN)
+    precision = confusion_matrix[0, 0] / (confusion_matrix[0, 0] + confusion_matrix[1, 0]) # TP / (TP + FP)
     f1 = 2 * recall * precision / (recall + precision)
     acc = (confusion_matrix[0, 0] + confusion_matrix[1, 1]) / np.sum(confusion_matrix)
     color_print(f"Recall={recall*100:.2f}%, Precision={precision*100:.2f}%, F-1 Score={f1*100:.2f}%, Accuracy={acc*100:.2f}%", color='green', bold=True)
