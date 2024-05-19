@@ -56,7 +56,7 @@ Therefore, as a tweak, I compute a pixel-area based confusion matrix. The steps 
 3. Compute pixel-based False Negative (FN). This is done by finding all the ground truth areas subtracted by intersected areas.
 4. Compute Intersection over Union (IoU). The formula is (TP) / (TP + FP + FN).
 5. Set True Negative (TN) to 0 as there is no such a case where prediction and ground truth masks are both none (no mask).
-6. Repeat steps 1 to 5 for each predicted mask agains all the ground truth masks within the same image.
+6. Repeat steps 1 to 5 for each predicted mask against all the ground truth masks within the same image.
 7. Per image, find an index when the IoU is the highest.
    
     <figure>
